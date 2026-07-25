@@ -128,6 +128,9 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-project_copy_online_firmware_asset
+if ! project_copy_online_firmware_asset; then
+    echo "Online firmware asset preparation failed" >&2
+    exit 1
+fi
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Build completed successfully."
