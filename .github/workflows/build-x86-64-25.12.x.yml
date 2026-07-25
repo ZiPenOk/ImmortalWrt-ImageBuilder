@@ -137,13 +137,6 @@ jobs:
             echo -e "\n#### 不带docker" >> ${{ github.workspace }}/router-info.md
           fi
 
-      - name: Create firmware checksum
-        run: |
-          find "${{ github.workspace }}/bin/targets/x86/64" "${{ github.workspace }}/bin/update" -type f -name '*.img.gz' -print0 |
-            while IFS= read -r -d '' image; do
-              (cd "$(dirname "$image")" && sha256sum "$(basename "$image")" > "$(basename "$image").sha256")
-            done
-
       - name: Upload ImmortWrt as release assets
         uses: softprops/action-gh-release@v3
         with:
