@@ -163,12 +163,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Clean old AutoUpdate assets
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPDATE_TAG: ${{ env.UPDATE_TAG }}
-        run: bash shell/clean-autoupdate-assets.sh
-
       - name: Upload AutoUpdate firmware assets
         uses: softprops/action-gh-release@v3
         with:
@@ -180,6 +174,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean old AutoUpdate assets
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          UPDATE_TAG: ${{ env.UPDATE_TAG }}
+        run: bash shell/clean-autoupdate-assets.sh
 
       - name: Publish update metadata
         env:

@@ -37,16 +37,59 @@ if [ -z "$release_id" ]; then
 fi
 
 assets_url="$api_base/repos/$GITHUB_REPOSITORY/releases/$release_id/assets?per_page=100"
-asset_ids="$(curl --fail --silent --show-error --location \
+assets_json="$(curl --fail --silent --show-error --location \
   --retry 5 --retry-delay 2 --retry-all-errors \
-  "${headers[@]}" "$assets_url" | \
-  jq -r '.[] | select(.name == "zzz_api" or (.name | test("\\.img\\.gz(\\.sha256)?$"))) | .id')"
+  "${headers[@]}" "$assets_url")"
 
-while IFS= read -r asset_id; do
+edition="${UPDATE_TAG#Update-x86-64-}"
+asset_prefix="${edition}-Immortalwrt-x86-64-"
+
+# Keep the current build and one rollback build. Each build normally has
+# one UEFI and one Legacy image, so four image files remain in total.
+keep_versions="$(printf '%s\n' "$assets_json" | jq -r '.[].name' | while IFS= read -r name; do
+  base_name="${name%.sha256}"
+  case "$base_name" in
+    "$asset_prefix"*.img.gz)
+      rest="${base_name#"$asset_prefix"}"
+      version="${rest%%-*}"
+      case "$version" in
+        ''|*[!0-9]*) ;;
+        *) printf '%s\n' "$version" ;;
+      esac
+      ;;
+  esac
+done | sort -nr -u | head -n 2)"
+
+echo "Keeping AutoUpdate build versions: ${keep_versions//$'\n'/, }"
+
+asset_rows="$(printf '%s' "$assets_json" | jq -r '.[] | select(.name == "zzz_api" or (.name | test("\\.img\\.gz(\\.sha256)?$"))) | [.id, .name] | @tsv')"
+
+while IFS=$'\t' read -r asset_id asset_name; do
   [ -n "$asset_id" ] || continue
+
+  remove_asset=0
+  if [ "$asset_name" = "zzz_api" ]; then
+    remove_asset=1
+  else
+    base_name="${asset_name%.sha256}"
+    case "$base_name" in
+      "$asset_prefix"*.img.gz)
+        rest="${base_name#"$asset_prefix"}"
+        version="${rest%%-*}"
+        if ! printf '%s\n' "$keep_versions" | grep -Fqx "$version"; then
+          remove_asset=1
+        fi
+        ;;
+      *)
+        remove_asset=1
+        ;;
+    esac
+  fi
+
+  [ "$remove_asset" -eq 1 ] || continue
   curl --fail --silent --show-error --location \
     --retry 5 --retry-delay 2 --retry-all-errors \
     -X DELETE "${headers[@]}" \
     "$api_base/repos/$GITHUB_REPOSITORY/releases/assets/$asset_id"
-  echo "Removed old AutoUpdate asset $asset_id"
-done <<< "$asset_ids"
+  echo "Removed old AutoUpdate asset $asset_name ($asset_id)"
+done <<< "$asset_rows"
