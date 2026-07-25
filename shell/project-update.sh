@@ -55,3 +55,10 @@ project_copy_online_firmware_asset() {
         return 1
     fi
 }
+
+project_remove_unneeded_firmware_assets() {
+    # Rootfs archives are not bootable images and are not used by AutoUpdate.
+    find bin/targets/x86/64 -type f \
+        \( -name '*squashfs-rootfs.img.gz' -o -name '*squashfs-rootfs.img' \) \
+        -print -delete
+}

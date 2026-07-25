@@ -129,6 +129,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
+project_remove_unneeded_firmware_assets
+
 if ! project_copy_online_firmware_asset; then
     echo "Online firmware asset preparation failed" >&2
     exit 1
