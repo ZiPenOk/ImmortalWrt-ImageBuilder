@@ -43,20 +43,31 @@ echo "Board detected: $board_name" >>$LOGFILE
 
 wan_ifname=""
 lan_ifnames=""
-# 此处特殊处理个别开发板网口顺序问题
-case "$board_name" in
-    "radxa,e20c"|"friendlyarm,nanopi-r5c")
-        wan_ifname="eth1"
-        lan_ifnames="eth0"
-        echo "Using $board_name mapping: WAN=$wan_ifname LAN=$lan_ifnames" >>"$LOGFILE"
-        ;;
-    *)
-        # 默认第一个接口为WAN，其余为LAN
-        wan_ifname=$(echo "$ifnames" | awk '{print $1}')
-        lan_ifnames=$(echo "$ifnames" | cut -d ' ' -f2-)
-        echo "Using default mapping: WAN=$wan_ifname LAN=$lan_ifnames" >>"$LOGFILE"
-        ;;
-esac
+# PVE/标准 x86 多网口约定：eth0 为 LAN，eth1 为 WAN，其余接口加入 LAN。
+if echo "$ifnames" | grep -qw eth0 && echo "$ifnames" | grep -qw eth1; then
+    wan_ifname="eth1"
+    for iface in $ifnames; do
+        if [ "$iface" != "$wan_ifname" ]; then
+            lan_ifnames="$lan_ifnames $iface"
+        fi
+    done
+    lan_ifnames=$(echo "$lan_ifnames" | awk '{$1=$1};1')
+    echo "Using standard mapping: WAN=$wan_ifname LAN=$lan_ifnames" >>"$LOGFILE"
+else
+    # 非标准接口名或特殊开发板，保留板型映射和原有顺序回退逻辑。
+    case "$board_name" in
+        "radxa,e20c"|"friendlyarm,nanopi-r5c")
+            wan_ifname="eth1"
+            lan_ifnames="eth0"
+            echo "Using $board_name mapping: WAN=$wan_ifname LAN=$lan_ifnames" >>"$LOGFILE"
+            ;;
+        *)
+            wan_ifname=$(echo "$ifnames" | awk '{print $1}')
+            lan_ifnames=$(echo "$ifnames" | cut -d ' ' -f2-)
+            echo "Using fallback mapping: WAN=$wan_ifname LAN=$lan_ifnames" >>"$LOGFILE"
+            ;;
+    esac
+fi
 
 # 3. 配置网络
 if [ "$count" -eq 1 ]; then
@@ -105,8 +116,8 @@ elif [ "$count" -gt 1 ]; then
         uci set network.lan.ipaddr=$CUSTOM_IP
         echo "custom router ip is $CUSTOM_IP" >> $LOGFILE
     else
-        uci set network.lan.ipaddr='192.168.100.1'
-        echo "default router ip is 192.168.100.1" >> $LOGFILE
+        uci set network.lan.ipaddr='10.10.10.10'
+        echo "default router ip is 10.10.10.10" >> $LOGFILE
     fi
 
     # PPPoE设置

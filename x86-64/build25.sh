@@ -2,24 +2,32 @@
 # Log file for debugging
 # 目前支持少部分第三方软件apk 通过打开shell/apk-custom-packages.sh的注释来集成
 source shell/apk-custom-packages.sh
+source shell/project-update.sh
 echo "第三方apk软件包: $CUSTOM_PACKAGES"
 LOGFILE="/tmp/uci-defaults-log.txt"
 echo "Starting 99-custom.sh at $(date)" >> $LOGFILE
 echo "编译固件大小为: $PROFILE MB"
 echo "Include Docker: $INCLUDE_DOCKER"
 
+project_prepare_update_metadata
+
+if [ -d custom ] && find custom -mindepth 1 -maxdepth 1 -type f -print -quit | grep -q .; then
+  cp -f custom/* files/etc/config/
+fi
+
 echo "Create pppoe-settings"
 mkdir -p  /home/build/immortalwrt/files/etc/config
 
-# 创建pppoe配置文件 yml传入环境变量ENABLE_PPPOE等 写入配置文件 供99-custom.sh读取
-cat << EOF > /home/build/immortalwrt/files/etc/config/pppoe-settings
-enable_pppoe=${ENABLE_PPPOE}
+# 创建pppoe配置文件。账号密码来自 GitHub Actions Secrets，不输出到构建日志。
+if [ "$ENABLE_PPPOE" = "yes" ]; then
+  cat << EOF > /home/build/immortalwrt/files/etc/config/pppoe-settings
+enable_pppoe=yes
 pppoe_account=${PPPOE_ACCOUNT}
 pppoe_password=${PPPOE_PASSWORD}
 EOF
-
-echo "cat pppoe-settings"
-cat /home/build/immortalwrt/files/etc/config/pppoe-settings
+else
+  printf '%s\n' 'enable_pppoe=no' > /home/build/immortalwrt/files/etc/config/pppoe-settings
+fi
 
 if [ -z "$CUSTOM_PACKAGES" ]; then
   echo "⚪️ 未选择 任何第三方软件包"
@@ -47,6 +55,8 @@ echo "$(date '+%Y-%m-%d %H:%M:%S') - 开始构建固件..."
 # 定义所需安装的包列表 下列插件你都可以自行删减
 PACKAGES=""
 PACKAGES="$PACKAGES curl"
+PACKAGES="$PACKAGES jq bc wget-ssl uclient-fetch"
+PACKAGES="$PACKAGES -attendedsysupgrade-common -luci-app-attendedsysupgrade -luci-i18n-attendedsysupgrade-zh-cn"
 PACKAGES="$PACKAGES luci-i18n-diskman-zh-cn"
 PACKAGES="$PACKAGES luci-i18n-firewall-zh-cn"
 PACKAGES="$PACKAGES luci-theme-argon"
@@ -75,19 +85,21 @@ if echo "$PACKAGES" | grep -q "luci-app-openclash"; then
     echo "✅ 已选择 luci-app-openclash，添加 openclash core"
     mkdir -p files/etc/openclash/core
     # Download clash_meta
-    META_URL="https://raw.githubusercontent.com/vernesong/OpenClash/core/master/meta/clash-linux-amd64-v1.tar.gz"
+    META_URL="https://raw.githubusercontent.com/vernesong/OpenClash/core/dev/meta/clash-linux-amd64-v3.tar.gz"
     wget -qO- $META_URL | tar xOvz > files/etc/openclash/core/clash_meta
     chmod +x files/etc/openclash/core/clash_meta
     # Download GeoIP and GeoSite
     wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat -O files/etc/openclash/GeoIP.dat
     wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat -O files/etc/openclash/GeoSite.dat
-    # Download latest openclash Client
-    URL=$(curl -s https://api.github.com/repos/vernesong/OpenClash/releases/latest \
-      | grep "browser_download_url.*apk" \
-      | head -n1 \
-      | cut -d '"' -f 4)
-    echo "OpenClash latest apk: $URL"
-    wget "$URL" -P /home/build/immortalwrt/packages/
+    # Download the package generated from the OpenClash dev branch.
+    DEV_PACKAGE_BASE="https://raw.githubusercontent.com/vernesong/OpenClash/package/dev"
+    OPENCLASH_VERSION=$(curl -fsSL "$DEV_PACKAGE_BASE/version" | sed -n '1s/^v//p')
+    URL="$DEV_PACKAGE_BASE/luci-app-openclash-${OPENCLASH_VERSION}.apk"
+    echo "OpenClash dev apk: $URL"
+    wget -q "$URL" -P /home/build/immortalwrt/packages/ || {
+        echo "Failed to download OpenClash dev apk"
+        exit 1
+    }
 else
     echo "⚪️ 未选择 luci-app-openclash"
 fi
@@ -116,5 +128,7 @@ if [ $? -ne 0 ]; then
     echo "$(date '+%Y-%m-%d %H:%M:%S') - Error: Build failed!"
     exit 1
 fi
+
+project_copy_online_firmware_asset
 
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Build completed successfully."

@@ -18,6 +18,10 @@ on:
           - 25.12.0-rc2
           - 25.12.0
           - 25.12.1
+      custom_router_ip:
+        description: "请设置路由器的管理地址(仅对多网口路由器有效)，例如 10.10.10.10"
+        required: true
+        default: "10.10.10.10"
       profile:
         description: '请输入要编译固件大小 单位(MB)'
         required: true
@@ -26,7 +30,7 @@ on:
         description: "集成 store 商店"
         required: false
         type: boolean
-        default: false
+        default: true
       include_docker:
         description: "是否编译 Docker 插件"
         required: true
@@ -38,24 +42,20 @@ on:
       enable_pppoe:
         description: "是否配置PPPoE拨号信息?"
         required: true
-        default: 'no'
+        default: 'yes'
         type: choice
         options:
           - 'yes'
           - 'no'
-      pppoe_account:
-        description: "宽带账号 (若启用PPPoE)"
-        required: false
-      pppoe_password:
-        description: "宽带密码 (若启用PPPoE)"
-        required: false
-
 permissions:
   contents: write
 
 jobs:
   build_immortalwrt:
     runs-on: ubuntu-22.04
+    env:
+      PPPOE_ACCOUNT: ${{ secrets.IMM_PPPOE_ACCOUNT }}
+      PPPOE_PASSWORD: ${{ secrets.IMM_PPPOE_PASSWORD }}
 
     steps:
       - name: Checkout code
@@ -63,12 +63,17 @@ jobs:
 
       - name: Set executable permissions
         run: chmod +x ${{ github.workspace }}/x86-64/build25.sh
+
+      - name: Save Custom Router IP into OpenWrt files
+        run: |
+          mkdir -p "${{ github.workspace }}/custom"
+          echo "${{ github.event.inputs.custom_router_ip }}" > "${{ github.workspace }}/custom/custom_router_ip.txt"
       
       - name: Validate PPPoE Inputs
         run: |
           if [[ "${{ github.event.inputs.enable_pppoe }}" == "yes" ]]; then
-            if [[ -z "${{ github.event.inputs.pppoe_account }}" || -z "${{ github.event.inputs.pppoe_password }}" ]]; then
-              echo "Error: PPPoE account and password must be provided when PPPoE is enabled!"
+            if [[ -z "$PPPOE_ACCOUNT" || -z "$PPPOE_PASSWORD" ]]; then
+              echo "Error: IMM_PPPOE_ACCOUNT and IMM_PPPOE_PASSWORD secrets must be set when PPPoE is enabled!"
               exit 1
             fi
           fi
@@ -86,25 +91,30 @@ jobs:
           profile="${{ github.event.inputs.profile }}"
           include_docker="${{ github.event.inputs.include_docker }}"
           luci_version="${{ github.event.inputs.luci_version }}"
+          update_version="$(date +%s)"
           echo "Building for profile: $profile"
           docker run --rm -i \
             --user root \
             -v "${{ github.workspace }}/bin:/home/build/immortalwrt/bin" \
             -v "${{ github.workspace }}/files:/home/build/immortalwrt/files" \
-            -v "${{ github.workspace }}/custom:/home/build/immortalwrt/files/etc/config" \
+            -v "${{ github.workspace }}/custom:/home/build/immortalwrt/custom" \
             -v "${{ github.workspace }}/x86-64/imm25.config:/home/build/immortalwrt/.config" \
             -v "${{ github.workspace }}/shell:/home/build/immortalwrt/shell" \
             -v "${{ github.workspace }}/x86-64/build25.sh:/home/build/immortalwrt/build.sh" \
             -e PROFILE=$profile \
             -e INCLUDE_DOCKER=$include_docker \
+            -e PROJECT_UPDATE_VERSION=$update_version \
+            -e PROJECT_LUCI_EDITION=25.12 \
+            -e PROJECT_UPDATE_TAG=Autobuild-x86-64-25.12 \
+            -e PROJECT_GITHUB_LINK=https://github.com/${{ github.repository }} \
             -e ENABLE_PPPOE=${{ inputs.enable_pppoe }} \
-            -e PPPOE_ACCOUNT=${{ inputs.pppoe_account }} \
-            -e PPPOE_PASSWORD=${{ inputs.pppoe_password }} \
+            -e "PPPOE_ACCOUNT=$PPPOE_ACCOUNT" \
+            -e "PPPOE_PASSWORD=$PPPOE_PASSWORD" \
           immortalwrt/imagebuilder:x86-64-openwrt-${luci_version} /bin/bash /home/build/immortalwrt/build.sh
 
       - name: ✅ 复制固件到根目录
         run: |
-          cp ${{ github.workspace }}/bin/targets/x86/64/*squashfs-combined-efi.img.gz ${{ github.workspace }}
+          cp ${{ github.workspace }}/bin/targets/x86/64/*.img.gz ${{ github.workspace }}
 
       - name: ✅ 上传固件到 artifact (for ISO generation)
         uses: actions/upload-artifact@v6
@@ -112,6 +122,39 @@ jobs:
           name: firmware-img
           path: |
             *.img.gz
+
+      - name: Create x86 update checksums
+        run: |
+          for image in *.img.gz; do
+            sha256sum "$image" > "$image.sha256"
+          done
+
+      - name: Upload x86 firmware release assets
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: Autobuild-x86-64-25.12
+          name: ImmortalWrt x86-64 25.12
+          files: '*.img.gz*'
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish update metadata
+        run: |
+          curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/Autobuild-x86-64-25.12" \
+            -o zzz_api
+
+      - name: Upload update metadata
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: Autobuild-x86-64-25.12
+          files: zzz_api
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build_installer_iso:
     runs-on: ubuntu-22.04
