@@ -5,7 +5,7 @@
 project_prepare_update_metadata() {
     PROJECT_UPDATE_VERSION="${PROJECT_UPDATE_VERSION:-$(date +%s)}"
     PROJECT_LUCI_EDITION="${PROJECT_LUCI_EDITION:-24.10}"
-    PROJECT_UPDATE_TAG="${PROJECT_UPDATE_TAG:-Autobuild-x86-64-${PROJECT_LUCI_EDITION}}"
+    PROJECT_UPDATE_TAG="${PROJECT_UPDATE_TAG:-Update-x86-64-${PROJECT_LUCI_EDITION}}"
     PROJECT_GITHUB_LINK="${PROJECT_GITHUB_LINK:-https://github.com/ZiPenOk/ImmortalWrt-ImageBuilder}"
     PROJECT_SOURCE="Immortalwrt"
     PROJECT_DEVICE_MODEL="x86-64"
@@ -44,8 +44,9 @@ project_copy_online_firmware_asset() {
 
         short_hash="$(md5sum "$image" | cut -c1-3)$(sha256sum "$image" | cut -c1-3)"
         online_name="${PROJECT_LUCI_EDITION}-${PROJECT_SOURCE}-${PROJECT_DEVICE_MODEL}-${PROJECT_UPDATE_VERSION}-${boot_type}-${short_hash}${PROJECT_FIRMWARE_SUFFIX}"
-        cp -f "$image" "$(dirname "$image")/$online_name"
-        echo "Online update asset: $online_name"
+        mkdir -p bin/update
+        cp -f "$image" "bin/update/$online_name"
+        echo "Online update asset: bin/update/$online_name"
         found=1
     done
 

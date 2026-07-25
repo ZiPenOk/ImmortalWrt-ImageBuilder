@@ -96,6 +96,10 @@ jobs:
           include_docker="${{ github.event.inputs.include_docker }}"
           luci_version="${{ github.event.inputs.luci_version }}"
           update_version="$(date +%s)"
+          release_tag="a$(date -u +%Y%m%d%H%M%S)"
+          update_tag="Update-x86-64-24.10"
+          echo "RELEASE_TAG=$release_tag" >> "$GITHUB_ENV"
+          echo "UPDATE_TAG=$update_tag" >> "$GITHUB_ENV"
           IFS=',' read -r -a profile_array <<< "$profiles"
           
           for profile in "${profile_array[@]}"; do
@@ -112,13 +116,16 @@ jobs:
               -e INCLUDE_DOCKER=$include_docker \
               -e PROJECT_UPDATE_VERSION=$update_version \
               -e PROJECT_LUCI_EDITION=24.10 \
-              -e PROJECT_UPDATE_TAG=Autobuild-x86-64-24.10 \
+              -e PROJECT_UPDATE_TAG=$update_tag \
               -e PROJECT_GITHUB_LINK=https://github.com/${{ github.repository }} \
               -e ENABLE_PPPOE=${{ inputs.enable_pppoe }} \
               -e "PPPOE_ACCOUNT=$PPPOE_ACCOUNT" \
               -e "PPPOE_PASSWORD=$PPPOE_PASSWORD" \
               immortalwrt/imagebuilder:x86-64-openwrt-${luci_version} /bin/bash /home/build/immortalwrt/build.sh
           done
+
+      - name: Fix firmware output ownership
+        run: sudo chown -R "$(id -u):$(id -g)" "${{ github.workspace }}/bin"
 
       - name: ✅ 复制固件到根目录
         run: |
@@ -136,13 +143,29 @@ jobs:
           for image in *.img.gz; do
             sha256sum "$image" > "$image.sha256"
           done
+          find "${{ github.workspace }}/bin/update" -type f -name '*.img.gz' -print0 |
+            while IFS= read -r -d '' image; do
+              (cd "$(dirname "$image")" && sha256sum "$(basename "$image")" > "$(basename "$image").sha256")
+            done
 
       - name: Upload x86 firmware release assets
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: Autobuild-x86-64-24.10
-          name: ImmortalWrt x86-64 24.10
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: Immortalwrt-24.10-x86-64
           files: '*.img.gz*'
+          token: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload AutoUpdate firmware assets
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ env.UPDATE_TAG }}
+          name: AutoUpdate-x86-64-24.10
+          make_latest: false
+          files: |
+            ${{ github.workspace }}/bin/update/*.img.gz*
           token: ${{ secrets.GITHUB_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -155,7 +178,7 @@ jobs:
             --retry 5 --retry-delay 2 --retry-all-errors \
             -H "Accept: application/vnd.github+json" \
             -H "Authorization: Bearer $GITHUB_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/releases/tags/Autobuild-x86-64-24.10" \
+            "https://api.github.com/repos/${{ github.repository }}/releases/tags/${{ env.UPDATE_TAG }}" \
             -o zzz_api
           test -s zzz_api
           jq -e '.assets | type == "array"' zzz_api >/dev/null
@@ -163,7 +186,8 @@ jobs:
       - name: Upload update metadata
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: Autobuild-x86-64-24.10
+          tag_name: ${{ env.UPDATE_TAG }}
+          make_latest: false
           files: zzz_api
           token: ${{ secrets.GITHUB_TOKEN }}
         env:
