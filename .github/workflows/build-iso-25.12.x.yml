@@ -119,6 +119,18 @@ jobs:
       - name: Fix firmware output ownership
         run: sudo chown -R "$(id -u):$(id -g)" "${{ github.workspace }}/bin"
 
+      - name: Create release info
+        run: |
+          cat > "${{ github.workspace }}/router-info.md" <<EOF
+          ## Router information
+
+          - Management address: ${{ github.event.inputs.custom_router_ip }}
+          - Username: root
+          - Password: none
+          - Docker: ${{ github.event.inputs.include_docker }}
+          - PPPoE: ${{ github.event.inputs.enable_pppoe }}
+          EOF
+
       - name: ✅ 复制固件到根目录
         run: |
           cp ${{ github.workspace }}/bin/targets/x86/64/*.img.gz ${{ github.workspace }}
@@ -145,6 +157,7 @@ jobs:
         with:
           tag_name: ${{ env.RELEASE_TAG }}
           name: Immortalwrt-25.12-x86-64
+          body_path: ${{ github.workspace }}/router-info.md
           files: '*.img.gz*'
           token: ${{ secrets.GITHUB_TOKEN }}
         env:
