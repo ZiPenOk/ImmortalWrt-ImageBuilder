@@ -119,9 +119,16 @@ project_install_mosdns_packages() {
             MOSDNS_LUCI_MARKER="/luci-app-mosdns-t_"
             ;;
         25.12)
-            MOSDNS_ASSET_EXTENSION=".apk"
-            MOSDNS_CORE_MARKER="/mosdns-t-"
-            MOSDNS_LUCI_MARKER="/luci-app-mosdns-t-"
+            MOSDNS_REPOSITORY_URL="https://jasonxtt.github.io/mosdns/packages/25.12/x86_64/packages.adb"
+            if [ ! -f repositories ]; then
+                echo "ImageBuilder APK repositories file is missing" >&2
+                return 1
+            fi
+            if ! grep -Fqx "$MOSDNS_REPOSITORY_URL" repositories; then
+                printf '%s\n' "$MOSDNS_REPOSITORY_URL" >> repositories
+            fi
+            echo "Added MosDNS-T APK repository for 25.12 x86_64"
+            return 0
             ;;
         *)
             echo "Unsupported MosDNS-T OpenWrt edition: ${PROJECT_LUCI_EDITION:-unknown}" >&2
