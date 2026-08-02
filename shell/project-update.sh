@@ -112,14 +112,19 @@ project_install_mosdns_packages() {
             ;;
     esac
 
+    MOSDNS_USE_REPOSITORY=0
     case "${PROJECT_LUCI_EDITION:-}" in
         24.10)
             MOSDNS_ASSET_EXTENSION=".ipk"
             MOSDNS_CORE_MARKER="/mosdns-t_"
             MOSDNS_LUCI_MARKER="/luci-app-mosdns-t_"
+            MOSDNS_KEY_URL="https://jasonxtt.github.io/mosdns/keys/mosdns-t.pub"
+            MOSDNS_KEY_PATH="keys/mosdns-t.pub"
             ;;
         25.12)
             MOSDNS_REPOSITORY_URL="https://jasonxtt.github.io/mosdns/packages/25.12/x86_64/packages.adb"
+            MOSDNS_KEY_URL="https://jasonxtt.github.io/mosdns/keys/mosdns-t.pem"
+            MOSDNS_KEY_PATH="keys/mosdns-t.pem"
             if [ ! -f repositories ]; then
                 echo "ImageBuilder APK repositories file is missing" >&2
                 return 1
@@ -128,13 +133,23 @@ project_install_mosdns_packages() {
                 printf '%s\n' "$MOSDNS_REPOSITORY_URL" >> repositories
             fi
             echo "Added MosDNS-T APK repository for 25.12 x86_64"
-            return 0
+            MOSDNS_USE_REPOSITORY=1
             ;;
         *)
             echo "Unsupported MosDNS-T OpenWrt edition: ${PROJECT_LUCI_EDITION:-unknown}" >&2
             return 1
             ;;
     esac
+
+    mkdir -p keys
+    if ! wget -q "$MOSDNS_KEY_URL" -O "$MOSDNS_KEY_PATH" || [ ! -s "$MOSDNS_KEY_PATH" ]; then
+        echo "Failed to download MosDNS-T repository key" >&2
+        return 1
+    fi
+
+    if [ "$MOSDNS_USE_REPOSITORY" -eq 1 ]; then
+        return 0
+    fi
 
     MOSDNS_RELEASE_API="https://api.github.com/repos/jasonxtt/mosdns/releases/latest"
     MOSDNS_RELEASE_JSON="$(curl -fsSL --retry 3 --retry-delay 2 "$MOSDNS_RELEASE_API")" || {
