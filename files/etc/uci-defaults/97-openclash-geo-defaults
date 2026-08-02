@@ -1,0 +1,17 @@
+#!/bin/sh
+
+if [ -f /etc/config/openclash ]; then
+	uci set openclash.config.geo_auto_update='1'
+	uci set openclash.config.geoip_auto_update='1'
+	uci set openclash.config.geosite_auto_update='1'
+	uci set openclash.config.geoasn_auto_update='1'
+	uci set openclash.config.geo_custom_url='https://github.com/alecthw/mmdb_china_ip_list/releases/latest/download/Country-lite.mmdb'
+	uci set openclash.config.geoip_custom_url='https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat'
+	uci set openclash.config.geosite_custom_url='https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat'
+	uci set openclash.config.geoasn_custom_url='https://github.com/xishang0128/geoip/releases/latest/download/GeoLite2-ASN.mmdb'
+	uci set openclash.config.chnr_custom_url='https://ispip.clang.cn/all_cn.txt'
+	uci set openclash.config.chnr6_custom_url='https://ispip.clang.cn/all_cn_ipv6.txt'
+	uci commit openclash
+fi
+
+exit 0

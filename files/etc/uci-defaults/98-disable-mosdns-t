@@ -1,0 +1,15 @@
+#!/bin/sh
+
+# Keep MosDNS-T installed, but disabled and stopped on the first boot.
+if uci -q get mosdns-t.main.enabled >/dev/null 2>&1; then
+	uci set mosdns-t.main.enabled='0'
+	uci commit mosdns-t
+fi
+
+for init_script in /etc/init.d/mosdns-t /etc/init.d/mosdns; do
+	[ -x "$init_script" ] || continue
+	"$init_script" stop >/dev/null 2>&1 || true
+	"$init_script" disable >/dev/null 2>&1 || true
+done
+
+exit 0

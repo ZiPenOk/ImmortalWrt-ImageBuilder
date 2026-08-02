@@ -85,13 +85,31 @@ fi
 if echo "$PACKAGES" | grep -q "luci-app-openclash"; then
     echo "✅ 已选择 luci-app-openclash，添加 openclash core"
     mkdir -p files/etc/openclash/core
-    # Download clash_meta
+    # Download and validate the latest Clash Meta core for OpenClash.
     META_URL="https://raw.githubusercontent.com/vernesong/OpenClash/core/dev/meta/clash-linux-amd64-v3.tar.gz"
-    wget -qO- $META_URL | tar xOvz > files/etc/openclash/core/clash_meta
+    META_ARCHIVE="$(mktemp /tmp/clash-meta.XXXXXX.tar.gz)"
+    if ! wget -q "$META_URL" -O "$META_ARCHIVE" || [ ! -s "$META_ARCHIVE" ]; then
+        echo "Failed to download Clash Meta core" >&2
+        rm -f "$META_ARCHIVE"
+        exit 1
+    fi
+    if ! tar -xOzf "$META_ARCHIVE" > files/etc/openclash/core/clash_meta || [ ! -s files/etc/openclash/core/clash_meta ]; then
+        echo "Failed to extract Clash Meta core" >&2
+        rm -f "$META_ARCHIVE" files/etc/openclash/core/clash_meta
+        exit 1
+    fi
+    rm -f "$META_ARCHIVE"
     chmod +x files/etc/openclash/core/clash_meta
-    # Download GeoIP and GeoSite
-    wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat -O files/etc/openclash/GeoIP.dat
-    wget -q https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat -O files/etc/openclash/GeoSite.dat
+    # Download the latest OpenClash Geo databases.
+    mkdir -p files/etc/openclash
+    wget -q "https://github.com/alecthw/mmdb_china_ip_list/releases/latest/download/Country-lite.mmdb" \
+        -O files/etc/openclash/Country.mmdb || { echo "Failed to download GeoIP MMDB" >&2; exit 1; }
+    wget -q "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat" \
+        -O files/etc/openclash/GeoIP.dat || { echo "Failed to download GeoIP DAT" >&2; exit 1; }
+    wget -q "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat" \
+        -O files/etc/openclash/GeoSite.dat || { echo "Failed to download GeoSite DAT" >&2; exit 1; }
+    wget -q "https://github.com/xishang0128/geoip/releases/latest/download/GeoLite2-ASN.mmdb" \
+        -O files/etc/openclash/GeoIP-ASN.mmdb || { echo "Failed to download Geo ASN MMDB" >&2; exit 1; }
     # Download the package generated from the OpenClash dev branch.
     DEV_PACKAGE_BASE="https://raw.githubusercontent.com/vernesong/OpenClash/package/dev"
     OPENCLASH_VERSION=$(curl -fsSL "$DEV_PACKAGE_BASE/version" | sed -n '1s/^v//p')
