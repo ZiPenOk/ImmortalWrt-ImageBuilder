@@ -30,6 +30,62 @@ RELEASE_DOWNLOAD="${PROJECT_GITHUB_LINK}/releases/download/${PROJECT_UPDATE_TAG}
 EOF
 }
 
+project_install_zashboard_overlay() {
+    case " ${PACKAGES:-} " in
+        *" luci-app-openclash "*) ;;
+        *)
+            return 0
+            ;;
+    esac
+
+    ZASHBOARD_URL="${ZASHBOARD_URL:-https://github.com/ZiPenOk/zashboard/releases/latest/download/zashboard.zip}"
+    if ! ZASHBOARD_TMP="$(mktemp -d /tmp/zashboard.XXXXXX)"; then
+        echo "Cannot create temporary directory for custom Zashboard" >&2
+        return 1
+    fi
+    ZASHBOARD_ZIP="$ZASHBOARD_TMP/zashboard.zip"
+    ZASHBOARD_DIST="$ZASHBOARD_TMP/dist"
+    ZASHBOARD_TARGET="/home/build/immortalwrt/files/usr/share/openclash/ui/zashboard"
+
+    echo "Downloading custom Zashboard release"
+    if ! curl -fsSL --retry 3 --retry-delay 2 \
+        "$ZASHBOARD_URL" -o "$ZASHBOARD_ZIP"; then
+        echo "Failed to download custom Zashboard" >&2
+        rm -rf "$ZASHBOARD_TMP"
+        return 1
+    fi
+
+    if command -v unzip >/dev/null 2>&1; then
+        if ! unzip -q "$ZASHBOARD_ZIP" -d "$ZASHBOARD_TMP"; then
+            echo "Failed to extract custom Zashboard" >&2
+            rm -rf "$ZASHBOARD_TMP"
+            return 1
+        fi
+    elif command -v busybox >/dev/null 2>&1 && busybox unzip --help >/dev/null 2>&1; then
+        if ! busybox unzip -q "$ZASHBOARD_ZIP" -d "$ZASHBOARD_TMP"; then
+            echo "Failed to extract custom Zashboard" >&2
+            rm -rf "$ZASHBOARD_TMP"
+            return 1
+        fi
+    else
+        echo "Cannot install custom Zashboard: unzip is unavailable in the build container" >&2
+        rm -rf "$ZASHBOARD_TMP"
+        return 1
+    fi
+
+    if [ ! -f "$ZASHBOARD_DIST/index.html" ]; then
+        echo "Custom Zashboard archive must contain dist/index.html" >&2
+        rm -rf "$ZASHBOARD_TMP"
+        return 1
+    fi
+
+    rm -rf "$ZASHBOARD_TARGET"
+    mkdir -p "$ZASHBOARD_TARGET"
+    cp -a "$ZASHBOARD_DIST"/. "$ZASHBOARD_TARGET"/
+    rm -rf "$ZASHBOARD_TMP"
+    echo "Installed custom Zashboard into $ZASHBOARD_TARGET"
+}
+
 project_copy_online_firmware_asset() {
     found=0
     for spec in \

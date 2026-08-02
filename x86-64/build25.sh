@@ -119,6 +119,11 @@ else
 fi
 
 # 构建镜像
+if ! project_install_zashboard_overlay; then
+    echo "Custom Zashboard installation failed" >&2
+    exit 1
+fi
+
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Building image with the following packages:"
 echo "$PACKAGES"
 
