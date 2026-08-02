@@ -104,6 +104,62 @@ project_install_zashboard_overlay() {
     echo "Installed custom Zashboard into $ZASHBOARD_TARGET"
 }
 
+project_install_mosdns_packages() {
+    case " ${PACKAGES:-} " in
+        *" mosdns-t "*|*" luci-app-mosdns-t "*) ;;
+        *)
+            return 0
+            ;;
+    esac
+
+    case "${PROJECT_LUCI_EDITION:-}" in
+        24.10)
+            MOSDNS_ASSET_EXTENSION=".ipk"
+            MOSDNS_CORE_MARKER="/mosdns-t_"
+            MOSDNS_LUCI_MARKER="/luci-app-mosdns-t_"
+            ;;
+        25.12)
+            MOSDNS_ASSET_EXTENSION=".apk"
+            MOSDNS_CORE_MARKER="/mosdns-t-"
+            MOSDNS_LUCI_MARKER="/luci-app-mosdns-t-"
+            ;;
+        *)
+            echo "Unsupported MosDNS-T OpenWrt edition: ${PROJECT_LUCI_EDITION:-unknown}" >&2
+            return 1
+            ;;
+    esac
+
+    MOSDNS_RELEASE_API="https://api.github.com/repos/jasonxtt/mosdns/releases/latest"
+    MOSDNS_RELEASE_JSON="$(curl -fsSL --retry 3 --retry-delay 2 "$MOSDNS_RELEASE_API")" || {
+        echo "Failed to query the latest MosDNS-T release" >&2
+        return 1
+    }
+
+    MOSDNS_CORE_URL="$(printf '%s\n' "$MOSDNS_RELEASE_JSON" | awk -F'"' \
+        -v marker="$MOSDNS_CORE_MARKER" -v extension="$MOSDNS_ASSET_EXTENSION" \
+        '/"browser_download_url":/ && index($0, marker) && index($0, "x86_64") && index($0, extension) { print $4; exit }')"
+    MOSDNS_LUCI_URL="$(printf '%s\n' "$MOSDNS_RELEASE_JSON" | awk -F'"' \
+        -v marker="$MOSDNS_LUCI_MARKER" -v extension="$MOSDNS_ASSET_EXTENSION" \
+        '/"browser_download_url":/ && index($0, marker) && index($0, "x86_64") && index($0, extension) { print $4; exit }')"
+
+    if [ -z "$MOSDNS_CORE_URL" ] || [ -z "$MOSDNS_LUCI_URL" ]; then
+        echo "Latest MosDNS-T release has no matching x86_64 ${MOSDNS_ASSET_EXTENSION} packages" >&2
+        return 1
+    fi
+
+    MOSDNS_PACKAGE_DIR="/home/build/immortalwrt/packages"
+    mkdir -p "$MOSDNS_PACKAGE_DIR"
+    echo "Downloading latest MosDNS-T packages for ${PROJECT_LUCI_EDITION} x86_64"
+    wget -q "$MOSDNS_CORE_URL" -P "$MOSDNS_PACKAGE_DIR" || {
+        echo "Failed to download mosdns-t package" >&2
+        return 1
+    }
+    wget -q "$MOSDNS_LUCI_URL" -P "$MOSDNS_PACKAGE_DIR" || {
+        echo "Failed to download luci-app-mosdns-t package" >&2
+        return 1
+    }
+}
+
 project_copy_online_firmware_asset() {
     found=0
     for spec in \

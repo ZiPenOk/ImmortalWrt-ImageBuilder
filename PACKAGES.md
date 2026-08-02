@@ -4,6 +4,7 @@
 
 | 第三方软件名称                  | 简介 / 功能描述                        | 来源 / 项目地址                                                                           |
 | --------------------- | -------------------------------- | ----------------------------------------------------------------------------------- |
+| mosdns-t / luci-app-mosdns-t | MosDNS-T DNS 分流器及 LuCI 管理界面 | [jasonxtt/mosdns](https://github.com/jasonxtt/mosdns) |
 | luci-app-store        | iStore应用商店(0.1.30-1)             | [linkease/luci-app-store](https://github.com/linkease/istore)                 |
 | luci-app-amlogic             | 晶晨宝盒(仅限ARM-64平台) | [ophub/luci-app-amlogic](https://github.com/ophub/luci-app-amlogic)                       |
 | luci-app-adguardhome  | 本地 DNS 去广告解决方案                   | [AdGuardTeam/AdGuardHome](https://github.com/AdguardTeam/AdGuardHome)               |

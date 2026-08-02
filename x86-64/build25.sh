@@ -125,6 +125,11 @@ if ! project_install_zashboard_overlay; then
     exit 1
 fi
 
+if ! project_install_mosdns_packages; then
+    echo "MosDNS-T package preparation failed" >&2
+    exit 1
+fi
+
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Building image with the following packages:"
 echo "$PACKAGES"
 
