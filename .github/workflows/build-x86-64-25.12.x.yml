@@ -127,7 +127,7 @@ jobs:
           
           - 🏠 **后台地址**: ${{ github.event.inputs.custom_router_ip }}
           - 👤 **用户名**: root
-          - 🔑 **密码**: 无
+          - 🔑 **密码**: 已配置，请首次登录后修改
           EOF
 
           if [ "${{ github.event.inputs.include_docker }}" == "yes" ]; then

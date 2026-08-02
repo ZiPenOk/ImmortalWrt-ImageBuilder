@@ -10,6 +10,7 @@ echo "编译固件大小为: $PROFILE MB"
 echo "Include Docker: $INCLUDE_DOCKER"
 
 project_prepare_update_metadata
+project_prepare_root_password_defaults
 
 if [ -d custom ] && find custom -mindepth 1 -maxdepth 1 -type f -print -quit | grep -q .; then
   cp -f custom/* files/etc/config/

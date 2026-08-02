@@ -30,6 +30,24 @@ RELEASE_DOWNLOAD="${PROJECT_GITHUB_LINK}/releases/download/${PROJECT_UPDATE_TAG}
 EOF
 }
 
+project_prepare_root_password_defaults() {
+    # Store only a SHA-512 crypt hash in the generated first-boot script.
+    ROOT_PASSWORD_HASH='$6$Ft9HNSn4ng/rtoj8$54lXDtm0rvABhXFXhQmgpHP/1Yt8hsZ7lyI6AuP..KmkE3mwyVf1NBhDV4cdsAY0NvwQyBxxlbVHWfR8OD3hc0'
+
+    mkdir -p files/etc/uci-defaults
+    cat > files/etc/uci-defaults/05-project-root-password <<EOF
+#!/bin/sh
+ROOT_PASSWORD_HASH='${ROOT_PASSWORD_HASH}'
+
+if [ -f /etc/shadow ]; then
+    sed -i "s#^root:[^:]*:#root:\${ROOT_PASSWORD_HASH}:#" /etc/shadow
+fi
+
+exit 0
+EOF
+    chmod 700 files/etc/uci-defaults/05-project-root-password
+}
+
 project_install_zashboard_overlay() {
     case " ${PACKAGES:-} " in
         *" luci-app-openclash "*) ;;

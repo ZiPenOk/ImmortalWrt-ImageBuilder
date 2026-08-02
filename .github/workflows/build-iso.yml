@@ -134,7 +134,7 @@ jobs:
 
           - Management address: ${{ github.event.inputs.custom_router_ip }}
           - Username: root
-          - Password: none
+          - Password: configured; change it after first login
           - Docker: ${{ github.event.inputs.include_docker }}
           - PPPoE: ${{ github.event.inputs.enable_pppoe }}
           EOF
